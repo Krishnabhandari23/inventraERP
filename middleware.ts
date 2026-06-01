@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-const SESSION_COOKIE = 'inventra_mock_session';
+import { SESSION_COOKIE } from '@/app/auth-constants';
 const PUBLIC_PATHS = new Set(['/login', '/api/auth/login', '/api/auth/logout', '/api/auth/session', '/favicon.ico']);
 
 function isStaticAsset(pathname: string) {

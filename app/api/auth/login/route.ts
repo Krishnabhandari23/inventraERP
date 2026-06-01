@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
+import { SESSION_COOKIE } from '@/app/auth-constants';
 
-const SESSION_COOKIE = 'inventra_mock_session';
 const BACKEND_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api';
 
 type LoginPayload = {
@@ -89,6 +89,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-// Helper re-exported for other routes that share the same cookie name.
-export { SESSION_COOKIE };

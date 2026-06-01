@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { SESSION_COOKIE } from '../login/route';
+import { SESSION_COOKIE } from '@/app/auth-constants';
 
 export async function POST() {
   const response = NextResponse.json({ success: true, message: 'Session cleared.' });

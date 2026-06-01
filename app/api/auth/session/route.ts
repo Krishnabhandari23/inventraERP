@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { SESSION_COOKIE } from '../login/route';
+import { SESSION_COOKIE } from '@/app/auth-constants';
 
 export async function GET() {
   const sessionCookie = cookies().get(SESSION_COOKIE)?.value;
