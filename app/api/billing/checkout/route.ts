@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const stripe = new Stripe(key, { apiVersion: '2024-06-20' });
+    const stripe = new Stripe(key, { apiVersion: '2023-10-16' });
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: process.env.STRIPE_PRICE_ID || 'price_xxx', quantity: 1 }],

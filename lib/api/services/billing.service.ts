@@ -12,7 +12,7 @@ export interface Subscription {
   currentPeriodEnd?: string;
 }
 
-export interface Invoice {
+export interface BillingInvoice {
   id: string;
   number: string;
   amount: number;
@@ -50,7 +50,7 @@ export const billingService = {
   /**
    * Get invoices
    */
-  getInvoices: async (): Promise<Invoice[]> => {
+  getInvoices: async (): Promise<BillingInvoice[]> => {
     const response = await apiClient.get<{ success: boolean; data: Array<{
       id: string;
       invoiceNumber: string;

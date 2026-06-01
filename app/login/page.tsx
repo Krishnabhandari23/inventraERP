@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState, Suspense } from 'react';
 
 type FormState = {
   email: string;
@@ -310,6 +310,28 @@ function AnimatedField({
 }
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageLoading />}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
+
+function LoginPageLoading() {
+  return (
+    <main className="relative min-h-screen w-full overflow-hidden bg-gradient-to-br from-[#0d1023] via-[#1a1233] to-[#0d1023]">
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex w-full max-w-sm flex-col gap-3 rounded-2xl bg-white/5 px-8 py-10 backdrop-blur-lg">
+          <div className="h-3 w-28 animate-pulse rounded-full bg-white/15" />
+          <div className="h-3 w-40 animate-pulse rounded-full bg-white/10" />
+          <div className="h-3 w-32 animate-pulse rounded-full bg-white/10" />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [form, setForm] = useState<FormState>({ email: '', password: '', storeId: '' });
