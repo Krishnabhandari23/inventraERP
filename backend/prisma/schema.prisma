@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id           String   @id @default(cuid())
+  name         String
+  subdomain    String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  users        User[]
+  orgs         Org[]
+  subscriptions Subscription[]
+  audits       Audit[]
+  usageEvents  UsageEvent[]
+  webhooks     Webhook[]
+  
+  @@index([subdomain])
+}
+
+model Org {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sites     Site[]
+}
+
+model Site {
+  id        String   @id @default(cuid())
+  orgId     String
+  name      String
+  org       Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  tenantId  String
+  role      String   @default("worker")  // owner | manager | finance | production | worker
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  @@index([email, tenantId])
+  @@index([tenantId])
+}
+
+model Subscription {
+  id          String   @id @default(cuid())
+  tenantId    String
+  plan        String   // starter | growth | enterprise
+  status      String   @default("active")  // trialing | active | past_due | canceled
+  stripeId    String?
+  currentPeriodEnd DateTime?
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model UsageEvent {
+  id        String   @id @default(cuid())
+  tenantId  String
+  kind      String   // e.g., order.created, seat.active
+  amount    Int      // e.g., 1
+  at        DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  url       String
+  secret    String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model Audit {
+  id        String   @id @default(cuid())
+  tenantId  String
+  actor     String
+  action    String
+  entity    String
+  entityId  String
+  meta      String?
+  at        DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model WebhookLog {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  source    String   // stripe | inventra | custom
+  event     String
+  payload   String
+  createdAt DateTime @default(now())
+}
+
+model ProductionJob {
+  id          String   @id @default(cuid())
+  tenantId    String
+  jobNumber   String   @unique
+  productId   String
+  productName String
+  quantity    Int
+  status      String   @default("planned") // planned | in-progress | completed | on-hold | cancelled
+  startDate   DateTime
+  endDate     DateTime?
+  assignedTo  String?
+  materials   String?  // JSON string
+  progress    Int      @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([tenantId, status])
+  @@index([jobNumber])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  tenantId      String
+  orderNumber   String   @unique
+  customer      String
+  customerEmail String?
+  status        String   @default("pending") // pending | processing | completed | cancelled | shipped
+  items         String   // JSON string array of order items
+  subtotal      Float
+  tax           Float    @default(0)
+  shipping      Float    @default(0)
+  total         Float
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([tenantId, status])
+  @@index([orderNumber])
+  @@index([customer])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  tenantId      String
+  invoiceNumber String   @unique
+  customer      String
+  customerEmail String?
+  status        String   @default("pending") // pending | paid | overdue | cancelled
+  items         String   // JSON string array of invoice items
+  subtotal      Float
+  tax           Float    @default(0)
+  total         Float
+  issueDate     DateTime @default(now())
+  dueDate       DateTime
+  paidDate      DateTime?
+  paymentMethod String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([tenantId, status])
+  @@index([invoiceNumber])
+  @@index([customer])
+}
+
+model InventoryItem {
+  id            String   @id @default(cuid())
+  tenantId      String
+  sku           String
+  name          String
+  description   String?
+  category      String?
+  quantity      Int      @default(0)
+  unit          String   @default("pcs") // pcs, kg, m, l, etc
+  reorderPoint  Int?     // minimum quantity before reorder
+  location      String?
+  cost          Float?
+  price         Float?
+  supplier      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([tenantId, sku])
+  @@index([tenantId, category])
+  @@index([name])
+}
