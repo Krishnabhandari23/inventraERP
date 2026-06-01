@@ -13,7 +13,7 @@ Your frontend and backend are now set up for **single-service deployment** on Re
 
 2. **Procfile** - Tells Render how to run your application
    ```
-   web: npm run start:prod
+   web: NODE_ENV=production npm run start
    ```
 
 3. **render.yaml** - Infrastructure configuration (optional)
@@ -39,7 +39,7 @@ Select your GitHub repository (Krishnabhandari23/inventraERP)
 ### Step 3: Configure
 - **Name**: `inventra-erp-app`
 - **Runtime**: `Node`
-- **Build Command**: `npm run build:all`
+- **Build Command**: `npm install && npm run build:all`
 - **Start Command**: `npm run start`
 
 ### Step 4: Set Environment Variables

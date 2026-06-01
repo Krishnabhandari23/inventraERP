@@ -6,10 +6,9 @@
     "dev": "concurrently \"next dev\" \"cd backend && npm run dev\"",
     "dev:combined": "NODE_ENV=development node server.js",
     "build": "next build",
-    "build:all": "npm run build && cd backend && npm install && npm run build",
+    "build:all": "npm install && npm run build && cd backend && npm install && npm run build && cd ..",
     "start": "NODE_ENV=production node server.js",
-    "start:prod": "npm run build:all && npm run start",
-    "postinstall": "cd backend && npm install || true"
+    "start:prod": "npm run build:all && npm run start"
   },
   "dependencies": {
     "@prisma/client": "5.20.0",

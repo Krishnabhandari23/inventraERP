@@ -53,11 +53,13 @@ cd backend && npm run dev
 3. Connect your GitHub repository
 
 ### Step 2: Configure Build Settings
-- **Name**: `inventra-erp` (or your preferred name)
+- **Name**: `inventra-erp-app` (or your preferred name)
 - **Runtime**: `Node`
-- **Build Command**: `npm run build:all`
+- **Build Command**: `npm install && npm run build:all`
 - **Start Command**: `npm run start`
 - **Environment**: `production`
+
+⚠️ **Important**: Include `npm install` in the build command to ensure all dependencies are installed before building.
 
 ### Step 3: Set Environment Variables
 Add these environment variables in Render dashboard:
