@@ -13,23 +13,25 @@ export const login = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, errors: errors.array() });
     }
 
-    const { email, password, storeId } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const storeId = String(req.body.storeId || '').trim().toLowerCase();
 
     // Optimize: Single query to fetch user with tenant in one go
     const user = await prisma.user.findFirst({
-      where: { 
+      where: {
         email,
         tenant: {
-          subdomain: storeId
-        }
+          subdomain: storeId,
+        },
       },
       include: {
         tenant: {
           select: {
             id: true,
             name: true,
-            subdomain: true
-          }
+            subdomain: true,
+          },
         },
       },
     });
@@ -64,7 +66,7 @@ export const login = async (req: AuthRequest, res: Response) => {
     res.cookie('inventra_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -96,49 +98,97 @@ export const register = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ success: false, errors: errors.array() });
     }
 
-    const { email, password, name, storeId, role = 'worker' } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const name = String(req.body.name || '').trim();
+    const rawStoreId = String(req.body.storeId || '').trim();
+    const storeId = rawStoreId.toLowerCase();
+    const requestedRole = String(req.body.role || 'worker').trim().toLowerCase();
 
-    // Validate tenant by storeId (subdomain)
-    const tenant = await prisma.tenant.findUnique({
+    const normalizedRole = requestedRole === 'admin' ? 'owner' : ['owner', 'manager', 'worker'].includes(requestedRole) ? requestedRole : 'worker';
+
+    const tenantIdentifier = await prisma.tenant.findUnique({
       where: { subdomain: storeId },
     });
 
-    if (!tenant) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid Store ID' 
-      });
-    }
+    let tenant = tenantIdentifier;
+    let createdTenant = false;
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: { 
-        email,
-        tenantId: tenant.id,
-      },
-    });
-
-    if (existingUser) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'User already exists with this email' 
-      });
-    }
-
-    // Hash password
     const hashedPassword = await hashPassword(password);
+    let user;
 
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        role,
+    if (!tenant) {
+      createdTenant = true;
+
+      const created = await prisma.$transaction(async (tx) => {
+        const newTenant = await tx.tenant.create({
+          data: {
+            name: `${rawStoreId.charAt(0).toUpperCase() + rawStoreId.slice(1)}`,
+            subdomain: storeId,
+            orgs: {
+              create: [{ name: 'Main Office' }],
+            },
+            subscriptions: {
+              create: [{ plan: 'starter', status: 'active' }],
+            },
+          },
+        });
+
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            password: hashedPassword,
+            name,
+            role: normalizedRole,
+            tenantId: newTenant.id,
+          },
+          include: { tenant: true },
+        });
+
+        return { newTenant, newUser };
+      });
+
+      tenant = created.newTenant;
+      user = created.newUser;
+    } else {
+      // Check if user already exists within the tenant
+      const existingUser = await prisma.user.findUnique({
+        where: {
+          email_tenantId: {
+            email,
+            tenantId: tenant.id,
+          },
+        },
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'User already exists with this email for the selected store',
+        });
+      }
+
+      user = await prisma.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name,
+          role: normalizedRole,
+          tenantId: tenant.id,
+        },
+        include: { tenant: true },
+      });
+    }
+
+    if (createdTenant) {
+      await createAuditLog({
         tenantId: tenant.id,
-      },
-      include: { tenant: true },
-    });
+        actor: user.email,
+        action: 'TENANT_CREATE',
+        entity: 'TENANT',
+        entityId: tenant.id,
+      }).catch((err) => console.error('Audit log failed:', err));
+    }
 
     await createAuditLog({
       tenantId: user.tenantId,
@@ -150,7 +200,9 @@ export const register = async (req: AuthRequest, res: Response) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Registration successful. You can now login.',
+      message: createdTenant
+        ? 'Store created and registration successful. Please login.'
+        : 'Registration successful. You can now login.',
       user: {
         id: user.id,
         email: user.email,
@@ -258,7 +310,7 @@ export const refreshToken = async (req: AuthRequest, res: Response) => {
     res.cookie('inventra_token', newToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 

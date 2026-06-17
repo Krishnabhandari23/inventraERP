@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { createAuditLog } from '../utils/audit';
 import prisma from '../config/database';
+import { generateUniqueOrderNumber } from '../utils/orderNumbers';
 
 export const getOrders = async (req: AuthRequest, res: Response) => {
   try {
@@ -92,11 +93,8 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Generate order number
-    const count = await prisma.order.count({
-      where: { tenantId: req.tenantId! },
-    });
-    const orderNumber = `ORD-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+    // Generate unique order number
+    const orderNumber = generateUniqueOrderNumber();
 
     // Calculate totals
     const calculatedSubtotal = subtotal || items.reduce((sum, item) => sum + (item.quantity * item.price), 0);

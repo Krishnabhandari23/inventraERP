@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { SESSION_COOKIE } from '@/app/auth-constants';
 
-const BACKEND_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api';
+const BACKEND_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 type LoginPayload = {
   email?: string;
@@ -80,10 +80,11 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error('Mock login failed', error);
+    const message = error instanceof Error ? error.message : 'Temporary login failed to start. Please try again.';
     return NextResponse.json(
       {
         success: false,
-        message: 'Temporary login failed to start. Please try again.',
+        message,
       },
       { status: 500 }
     );

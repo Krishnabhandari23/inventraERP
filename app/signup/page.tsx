@@ -13,7 +13,7 @@ export default function SignupPage() {
     confirmPassword: "",
     name: "",
     storeId: "",
-    role: "WORKER" as "ADMIN" | "MANAGER" | "WORKER",
+    role: "worker" as "owner" | "manager" | "worker",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -63,8 +63,8 @@ export default function SignupPage() {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        setError(data.error || "Registration failed");
+      if (!response.ok || !data.success) {
+        setError(data.message || data.error || "Registration failed");
         setLoading(false);
         return;
       }
@@ -209,15 +209,15 @@ export default function SignupPage() {
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  role: e.target.value as "ADMIN" | "MANAGER" | "WORKER",
+                  role: e.target.value as "owner" | "manager" | "worker",
                 })
               }
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
               disabled={loading}
             >
-              <option value="WORKER">Worker</option>
-              <option value="MANAGER">Manager</option>
-              <option value="ADMIN">Admin</option>
+              <option value="worker">Worker</option>
+              <option value="manager">Manager</option>
+              <option value="owner">Admin</option>
             </select>
           </div>
 

@@ -42,13 +42,14 @@ model Site {
 
 model User {
   id        String   @id @default(cuid())
-  email     String   @unique
+  email     String
   password  String
   name      String?
   tenantId  String
   role      String   @default("worker")  // owner | manager | finance | production | worker
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   
+  @@unique([email, tenantId])
   @@index([email, tenantId])
   @@index([tenantId])
 }
@@ -191,3 +192,67 @@ model InventoryItem {
   @@index([tenantId, category])
   @@index([name])
 }
+
+model Approval {
+  id            String   @id @default(cuid())
+  tenantId      String
+  type          String   // job_creation | purchase_order | leave_request | routed_approval
+  status        String   @default("pending") // pending | approved | rejected
+  requestedBy   String
+  reviewedBy    String?
+  entityId      String
+  entityType    String   // job | purchase_order | leave_request | custom
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@index([entityId])
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  tenantId      String
+  title         String
+  message       String
+  type          String   @default("info") // info | approval | payment | alert
+  isRead        Boolean  @default(false)
+  entityId      String?
+  entityType    String?
+  createdAt     DateTime @default(now())
+  
+  @@index([userId, tenantId])
+  @@index([userId, isRead])
+}
+
+model InboxMessage {
+  id            String   @id @default(cuid())
+  senderId      String
+  recipientId   String
+  tenantId      String
+  subject       String?
+  body          String
+  isRead        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  
+  @@index([recipientId, tenantId])
+  @@index([recipientId, isRead])
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  tenantId          String
+  stripeSessionId   String?  @unique
+  amount            Float
+  status            String   @default("pending") // pending | paid | failed | canceled
+  entityId          String?
+  entityType        String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([tenantId, status])
+  @@index([stripeSessionId])
+}
+

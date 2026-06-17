@@ -35,6 +35,46 @@ class ApiClient {
     return url.toString();
   }
 
+  private async refreshAuthToken(): Promise<boolean> {
+    const token = this.getAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+        }
+        return false;
+      }
+
+      const data = await response.json();
+      if (data?.token && typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', data.token);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Auth refresh failed:', error);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token');
+      }
+      return false;
+    }
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestOptions = {}
@@ -60,8 +100,17 @@ class ApiClient {
       });
 
       if (!response.ok) {
-        // Don't auto-redirect on 401 since we're using cookie-based auth
-        // The middleware handles authentication redirects
+        if (response.status === 401) {
+          const refreshed = await this.refreshAuthToken();
+          if (refreshed) {
+            return this.request<T>(endpoint, options);
+          }
+
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token');
+          }
+        }
+
         const error = await response.json().catch(() => ({
           message: `HTTP ${response.status}: ${response.statusText}`,
         }));

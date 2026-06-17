@@ -47,7 +47,7 @@ async function main() {
 
   for (const userData of users) {
     const user = await prisma.user.upsert({
-      where: { email: userData.email },
+      where: { email_tenantId: { email: userData.email, tenantId: userData.tenantId } },
       update: {},
       create: userData,
     });
@@ -344,7 +344,7 @@ async function main() {
 
   for (const itemData of inventoryItems) {
     await prisma.inventoryItem.upsert({
-      where: { sku: itemData.sku },
+      where: { tenantId_sku: { tenantId: tenant.id, sku: itemData.sku } },
       update: {},
       create: itemData,
     });

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api';
+const BACKEND_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 type RegisterPayload = {
   email?: string;
@@ -58,10 +58,11 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error('Registration error:', error);
+    const message = error instanceof Error ? error.message : 'Registration failed. Please try again.';
     return NextResponse.json(
       {
         success: false,
-        message: 'Registration failed. Please try again.',
+        message,
       },
       { status: 500 }
     );

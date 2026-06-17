@@ -3,6 +3,21 @@ import { body, param, query, ValidationChain } from 'express-validator';
 export const loginValidation: ValidationChain[] = [
   body('email').isEmail().withMessage('Valid email is required'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('storeId').trim().notEmpty().withMessage('Store ID is required'),
+];
+
+export const registerValidation: ValidationChain[] = [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('storeId')
+    .trim()
+    .matches(/^[a-zA-Z0-9_-]{3,50}$/)
+    .withMessage('Store ID must be 3-50 characters and only contain letters, numbers, hyphens or underscores'),
+  body('role')
+    .optional()
+    .isIn(['owner', 'admin', 'manager', 'worker'])
+    .withMessage('Invalid role'),
 ];
 
 export const createUserValidation: ValidationChain[] = [

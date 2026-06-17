@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { SESSION_COOKIE } from '@/app/auth-constants';
-const PUBLIC_PATHS = new Set(['/login', '/api/auth/login', '/api/auth/logout', '/api/auth/session', '/favicon.ico']);
+const PUBLIC_PATHS = new Set(['/login', '/signup', '/api/auth/login', '/api/auth/register', '/api/auth/logout', '/api/auth/session', '/favicon.ico']);
 
 function isStaticAsset(pathname: string) {
   return (
@@ -27,7 +27,7 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (session && pathname === '/login') {
+  if (session && (pathname === '/login' || pathname === '/signup')) {
     return NextResponse.redirect(new URL('/', req.url));
   }
 

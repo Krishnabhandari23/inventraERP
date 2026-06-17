@@ -18,7 +18,9 @@ import billingRoutes from './routes/billing';
 import auditRoutes from './routes/audit';
 import usageRoutes from './routes/usage';
 import inboxRoutes from './routes/inbox';
+import notificationsRoutes from './routes/notifications';
 import integrationsRoutes from './routes/integrations';
+import invisRoutes from './routes/invis';
 
 dotenv.config();
 
@@ -58,7 +60,9 @@ app.use('/api/billing', billingRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/usage', usageRoutes);
 app.use('/api/inbox', inboxRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use('/api/integrations', integrationsRoutes);
+app.use('/api/invis', invisRoutes);
 
 // Error Handlers
 app.use(notFoundHandler);

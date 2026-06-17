@@ -1,63 +1,28 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
+import prisma from '../config/database';
 import { createAuditLog } from '../utils/audit';
+import { notifyApprovalResolved } from '../utils/notificationService';
 
 export const getApprovals = async (req: AuthRequest, res: Response) => {
   try {
+    const { tenantId } = req;
     const { status, type } = req.query;
 
-    const mockApprovals = [
-      {
-        id: 'APV-001',
-        type: 'purchase_order',
-        title: 'Purchase Order #PO-2025-045',
-        requestedBy: 'john.doe@example.com',
-        amount: 15000.00,
-        status: 'pending',
-        priority: 'high',
-        requestDate: new Date('2025-01-18'),
-        dueDate: new Date('2025-01-22'),
-        description: 'Raw materials for Q1 production',
-        tenantId: req.tenantId,
-      },
-      {
-        id: 'APV-002',
-        type: 'expense',
-        title: 'Marketing Campaign Budget',
-        requestedBy: 'jane.smith@example.com',
-        amount: 8500.00,
-        status: 'pending',
-        priority: 'medium',
-        requestDate: new Date('2025-01-19'),
-        dueDate: new Date('2025-01-25'),
-        description: 'Q1 digital marketing campaign',
-        tenantId: req.tenantId,
-      },
-      {
-        id: 'APV-003',
-        type: 'invoice',
-        title: 'Vendor Invoice #VIN-2025-123',
-        requestedBy: 'bob.wilson@example.com',
-        amount: 3200.00,
-        status: 'approved',
-        priority: 'low',
-        requestDate: new Date('2025-01-15'),
-        approvedDate: new Date('2025-01-16'),
-        approvedBy: req.user!.email,
-        description: 'Monthly maintenance services',
-        tenantId: req.tenantId,
-      },
-    ];
-
-    let filteredApprovals = mockApprovals;
-    if (status) {
-      filteredApprovals = filteredApprovals.filter(a => a.status === status);
-    }
-    if (type) {
-      filteredApprovals = filteredApprovals.filter(a => a.type === type);
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'Tenant ID required' });
     }
 
-    return res.json({ success: true, data: filteredApprovals });
+    const whereClause: any = { tenantId };
+    if (status) whereClause.status = status;
+    if (type) whereClause.type = type;
+
+    const approvals = await prisma.approval.findMany({
+      where: whereClause,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json({ success: true, data: approvals });
   } catch (error) {
     console.error('Get approvals error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch approvals' });
@@ -67,36 +32,21 @@ export const getApprovals = async (req: AuthRequest, res: Response) => {
 export const getApproval = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+    const { tenantId } = req;
 
-    const mockApproval = {
-      id,
-      type: 'purchase_order',
-      title: 'Purchase Order #PO-2025-045',
-      requestedBy: {
-        id: 'USER-001',
-        email: 'john.doe@example.com',
-        name: 'John Doe',
-      },
-      amount: 15000.00,
-      status: 'pending',
-      priority: 'high',
-      requestDate: new Date('2025-01-18'),
-      dueDate: new Date('2025-01-22'),
-      description: 'Raw materials for Q1 production',
-      attachments: [
-        { id: '1', name: 'quote.pdf', url: '/files/quote.pdf' },
-      ],
-      approvalChain: [
-        { role: 'manager', approver: 'manager@example.com', status: 'approved', date: new Date('2025-01-18') },
-        { role: 'finance', approver: req.user!.email, status: 'pending', date: null },
-      ],
-      comments: [
-        { author: 'John Doe', text: 'Urgent - needed for production start', date: new Date('2025-01-18') },
-      ],
-      tenantId: req.tenantId,
-    };
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'Tenant ID required' });
+    }
 
-    return res.json({ success: true, data: mockApproval });
+    const approval = await prisma.approval.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!approval) {
+      return res.status(404).json({ success: false, message: 'Approval not found' });
+    }
+
+    return res.json({ success: true, data: approval });
   } catch (error) {
     console.error('Get approval error:', error);
     return res.status(500).json({ success: false, message: 'Failed to fetch approval' });
@@ -105,48 +55,112 @@ export const getApproval = async (req: AuthRequest, res: Response) => {
 
 export const createApproval = async (req: AuthRequest, res: Response) => {
   try {
-    const { type, title, amount, description, priority, dueDate, attachments } = req.body;
+    const { type, entityId, entityType, reviewerId, notes } = req.body;
+    const { tenantId } = req;
+    const actor = req.user!.email;
 
-    if (!type || !title || !amount) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Type, title, and amount are required' 
+    if (!type || !entityId || !entityType) {
+      return res.status(400).json({
+        success: false,
+        message: 'type, entityId, and entityType are required',
       });
     }
 
-    const newApproval = {
-      id: `APV-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      type,
-      title,
-      requestedBy: req.user!.email,
-      amount,
-      description,
-      priority: priority || 'medium',
-      status: 'pending',
-      requestDate: new Date(),
-      dueDate: dueDate ? new Date(dueDate) : null,
-      attachments,
-      tenantId: req.tenantId,
-      createdAt: new Date(),
-    };
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'Tenant ID required' });
+    }
 
-    await createAuditLog({
-      tenantId: req.tenantId!,
-      actor: req.user!.email,
-      action: 'CREATE',
-      entity: 'APPROVAL',
-      entityId: newApproval.id,
-      meta: { type, title, amount },
+    const approval = await prisma.approval.create({
+      data: {
+        tenantId,
+        type,
+        entityId,
+        entityType,
+        status: 'pending',
+        requestedBy: actor,
+        reviewedBy: reviewerId || null,
+        notes: notes || null,
+      },
     });
 
-    return res.status(201).json({ 
-      success: true, 
-      message: 'Approval request created', 
-      data: newApproval 
+    await createAuditLog({
+      tenantId,
+      actor,
+      action: 'CREATE',
+      entity: 'APPROVAL',
+      entityId: approval.id,
+      meta: { type, entityType },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Approval request created',
+      data: approval,
     });
   } catch (error) {
     console.error('Create approval error:', error);
     return res.status(500).json({ success: false, message: 'Failed to create approval request' });
+  }
+};
+
+export const updateApprovalStatus = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+    const { tenantId } = req;
+    const actor = req.user!.email;
+
+    if (!['pending', 'approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    if (!tenantId) {
+      return res.status(400).json({ success: false, message: 'Tenant ID required' });
+    }
+
+    const approval = await prisma.approval.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!approval) {
+      return res.status(404).json({ success: false, message: 'Approval not found' });
+    }
+
+    const updated = await prisma.approval.update({
+      where: { id },
+      data: {
+        status,
+        reviewedBy: actor,
+        notes: notes || approval.notes,
+        updatedAt: new Date(),
+      },
+    });
+
+    await createAuditLog({
+      tenantId,
+      actor,
+      action: 'UPDATE',
+      entity: 'APPROVAL',
+      entityId: id,
+      meta: { previousStatus: approval.status, newStatus: status },
+    });
+
+    // Notify requester if status is not pending
+    if (status !== 'pending') {
+      await notifyApprovalResolved(
+        tenantId,
+        approval.requestedBy,
+        approval.entityType,
+        approval.entityId,
+        status as 'approved' | 'rejected',
+        actor
+      );
+    }
+
+    return res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Update approval error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update approval' });
   }
 };
 
@@ -220,37 +234,41 @@ export const rejectRequest = async (req: AuthRequest, res: Response) => {
 
 export const getMyPendingApprovals = async (req: AuthRequest, res: Response) => {
   try {
-    // Mock pending approvals for the current user's role
-    const mockPendingApprovals = [
-      {
-        id: 'APV-001',
-        type: 'purchase_order',
-        title: 'Purchase Order #PO-2025-045',
-        requestedBy: 'john.doe@example.com',
-        amount: 15000.00,
-        priority: 'high',
-        requestDate: new Date('2025-01-18'),
-        dueDate: new Date('2025-01-22'),
-      },
-      {
-        id: 'APV-002',
-        type: 'expense',
-        title: 'Marketing Campaign Budget',
-        requestedBy: 'jane.smith@example.com',
-        amount: 8500.00,
-        priority: 'medium',
-        requestDate: new Date('2025-01-19'),
-        dueDate: new Date('2025-01-25'),
-      },
-    ];
+    const { tenantId } = req;
+    console.log('[getMyPendingApprovals] Request data:', {
+      userId: req.user?.id,
+      userEmail: req.user?.email,
+      tenantId,
+    });
 
-    return res.json({ 
-      success: true, 
-      data: mockPendingApprovals,
-      count: mockPendingApprovals.length,
+    if (!tenantId) {
+      console.error('[getMyPendingApprovals] Missing tenantId');
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    // Fetch real pending approvals from database
+    const pendingApprovals = await prisma.approval.findMany({
+      where: {
+        tenantId,
+        status: 'pending',
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    console.log('[getMyPendingApprovals] Found approvals:', pendingApprovals.length);
+
+    return res.json({
+      success: true,
+      data: pendingApprovals,
+      count: pendingApprovals.length,
     });
   } catch (error) {
-    console.error('Get my pending approvals error:', error);
-    return res.status(500).json({ success: false, message: 'Failed to fetch pending approvals' });
+    console.error('[getMyPendingApprovals] Error:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch pending approvals',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };
